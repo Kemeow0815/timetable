@@ -22,30 +22,49 @@ export function createLiveTimetableStatus(payload) {
 }
 
 /**
- * 将十六进制颜色转换为 RGB
+ * 将十六进制颜色转换为 RGB，并在深色模式下增加亮度
  * @param {string} hex
  * @returns {string}
  */
 function hexToRgb(hex) {
   hex = hex.replace('#', '');
 
+  let r, g, b;
+
   // 处理 8 位十六进制（ARGB 格式）
   if (hex.length === 8) {
-    const r = parseInt(hex.substring(2, 4), 16);
-    const g = parseInt(hex.substring(4, 6), 16);
-    const b = parseInt(hex.substring(6, 8), 16);
-    return `rgb(${r}, ${g}, ${b})`;
+    r = parseInt(hex.substring(2, 4), 16);
+    g = parseInt(hex.substring(4, 6), 16);
+    b = parseInt(hex.substring(6, 8), 16);
   }
-
   // 处理 6 位十六进制
-  if (hex.length === 6) {
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    return `rgb(${r}, ${g}, ${b})`;
+  else if (hex.length === 6) {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+  } else {
+    return 'rgb(128, 128, 128)';
   }
 
-  return 'rgb(0, 0, 0)';
+  // 获取当前主题
+  const theme = document.documentElement.getAttribute('data-theme');
+  const isDarkMode = theme === 'dark';
+
+  // 只在深色模式下增加亮度
+  if (isDarkMode) {
+    // 计算当前亮度 (0-255)
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    // 深色模式下确保最小亮度为 160
+    const minBrightness = 160;
+    if (brightness < minBrightness) {
+      const factor = minBrightness / Math.max(brightness, 10);
+      r = Math.min(255, Math.round(r * factor));
+      g = Math.min(255, Math.round(g * factor));
+      b = Math.min(255, Math.round(b * factor));
+    }
+  }
+
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 /**
