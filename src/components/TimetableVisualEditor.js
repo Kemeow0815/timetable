@@ -2,8 +2,8 @@
  * 课表可视化编辑器组件
  */
 
-import { buildTimetableViewModel } from '../utils/timetable-normalizer.js';
-import { serializeTimetableDataToFileText } from '../utils/timetable-parser.js';
+import { buildTimetableViewModel } from "../utils/timetable-normalizer.js";
+import { serializeTimetableDataToFileText } from "../utils/timetable-parser.js";
 
 const DAY_LABELS = {
   1: "周一",
@@ -53,7 +53,11 @@ function deepClone(value) {
  * @param {import('../types/timetable.js').TimetableViewModel} viewModel
  * @param {import('../types/timetable.js').ParsedTimetableData} baselineParsed
  */
-export function initTimetableVisualEditor(container, viewModel, baselineParsed) {
+export function initTimetableVisualEditor(
+  container,
+  viewModel,
+  baselineParsed,
+) {
   let editMode = false;
   let draftParsed = deepClone(baselineParsed);
   let selectedArrangementIndex = null;
@@ -79,18 +83,37 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
       return;
     }
 
-    const previewViewModel = buildTimetableViewModel(draftParsed, viewModel.currentWeek);
-    const arrangementCards = buildArrangementCards(previewViewModel, draftParsed.arrangements);
-    
-    const existingCourseNames = [...new Set(draftParsed.courseDefinitions.map(c => c.courseName).filter(Boolean))];
-    const existingTeachers = [...new Set(draftParsed.arrangements.map(a => a.teacher).filter(Boolean))];
-    const existingRooms = [...new Set(draftParsed.arrangements.map(a => a.room).filter(Boolean))];
+    const previewViewModel = buildTimetableViewModel(
+      draftParsed,
+      viewModel.currentWeek,
+    );
+    const arrangementCards = buildArrangementCards(
+      previewViewModel,
+      draftParsed.arrangements,
+    );
 
-    const selectedArrangement = selectedArrangementIndex !== null 
-      ? draftParsed.arrangements[selectedArrangementIndex] 
-      : null;
+    const existingCourseNames = [
+      ...new Set(
+        draftParsed.courseDefinitions.map((c) => c.courseName).filter(Boolean),
+      ),
+    ];
+    const existingTeachers = [
+      ...new Set(
+        draftParsed.arrangements.map((a) => a.teacher).filter(Boolean),
+      ),
+    ];
+    const existingRooms = [
+      ...new Set(draftParsed.arrangements.map((a) => a.room).filter(Boolean)),
+    ];
+
+    const selectedArrangement =
+      selectedArrangementIndex !== null
+        ? draftParsed.arrangements[selectedArrangementIndex]
+        : null;
     const selectedCourseName = selectedArrangement
-      ? draftParsed.courseDefinitions.find(c => c.id === selectedArrangement?.id)?.courseName || ""
+      ? draftParsed.courseDefinitions.find(
+          (c) => c.id === selectedArrangement?.id,
+        )?.courseName || ""
       : "";
 
     container.innerHTML = `
@@ -106,56 +129,78 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
           当前为临时编辑模式：导出后将自动退出并恢复原始课表展示。
         </div>
         
-        ${validationError ? `
+        ${
+          validationError
+            ? `
           <div class="visual-editor-error">
             ${escapeHtml(validationError)}
           </div>
-        ` : ''}
+        `
+            : ""
+        }
         
         <div class="visual-editor-content">
           <div class="visual-editor-list">
             <h3>可视化课程列表（当前周）</h3>
             <div class="arrangement-grid">
-              ${arrangementCards.map(dayGroup => `
+              ${arrangementCards
+                .map(
+                  (dayGroup) => `
                 <div class="arrangement-day">
                   <div class="arrangement-day-title">${dayGroup.label}</div>
-                  ${dayGroup.items.length === 0 
-                    ? '<p class="arrangement-empty">本日暂无课程</p>'
-                    : `<div class="arrangement-items">
-                        ${dayGroup.items.map(item => `
+                  ${
+                    dayGroup.items.length === 0
+                      ? '<p class="arrangement-empty">本日暂无课程</p>'
+                      : `<div class="arrangement-items">
+                        ${dayGroup.items
+                          .map(
+                            (item) => `
                           <button type="button" 
-                            class="arrangement-card ${selectedArrangementIndex === item.arrangementIndex ? 'is-selected' : ''}"
+                            class="arrangement-card ${selectedArrangementIndex === item.arrangementIndex ? "is-selected" : ""}"
                             data-arrangement-index="${item.arrangementIndex}"
                             style="--card-color: ${item.color}">
                             <div class="arrangement-card-title">${escapeHtml(item.title)}</div>
                             <div class="arrangement-card-meta">${item.nodeText} · ${item.weekText}</div>
                             <div class="arrangement-card-info">${escapeHtml(item.teacher)} / ${escapeHtml(item.room)}</div>
                           </button>
-                        `).join('')}
+                        `,
+                          )
+                          .join("")}
                       </div>`
                   }
                 </div>
-              `).join('')}
+              `,
+                )
+                .join("")}
             </div>
           </div>
           
           <div class="visual-editor-panel">
             <h3>属性编辑面板</h3>
-            ${creatingCourse 
-              ? renderCreateForm(existingCourseNames, existingTeachers, existingRooms)
-              : selectedArrangement 
-                ? renderEditForm(selectedArrangement, selectedCourseName)
-                : '<p class="panel-hint">请先在左侧点击课程卡片，或点击上方"新增课程"。</p>'
+            ${
+              creatingCourse
+                ? renderCreateForm(
+                    existingCourseNames,
+                    existingTeachers,
+                    existingRooms,
+                  )
+                : selectedArrangement
+                  ? renderEditForm(selectedArrangement, selectedCourseName)
+                  : '<p class="panel-hint">请先在左侧点击课程卡片，或点击上方"新增课程"。</p>'
             }
           </div>
         </div>
       </div>
     `;
-    
+
     bindEvents();
   }
 
-  function renderCreateForm(existingCourseNames, existingTeachers, existingRooms) {
+  function renderCreateForm(
+    existingCourseNames,
+    existingTeachers,
+    existingRooms,
+  ) {
     const maxWeek = Math.max(1, draftParsed.meta.maxWeek || 1);
     return `
       <div class="editor-form">
@@ -163,7 +208,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
           <span>课程名</span>
           <input type="text" list="course-name-list" data-field="courseName" placeholder="输入课程名称">
           <datalist id="course-name-list">
-            ${existingCourseNames.map(name => `<option value="${escapeHtml(name)}">`).join('')}
+            ${existingCourseNames.map((name) => `<option value="${escapeHtml(name)}">`).join("")}
           </datalist>
         </label>
         
@@ -171,7 +216,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
           <span>教师</span>
           <input type="text" list="teacher-list" data-field="teacher" placeholder="输入教师姓名">
           <datalist id="teacher-list">
-            ${existingTeachers.map(teacher => `<option value="${escapeHtml(teacher)}">`).join('')}
+            ${existingTeachers.map((teacher) => `<option value="${escapeHtml(teacher)}">`).join("")}
           </datalist>
         </label>
         
@@ -179,14 +224,14 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
           <span>教室</span>
           <input type="text" list="room-list" data-field="room" placeholder="输入教室位置">
           <datalist id="room-list">
-            ${existingRooms.map(room => `<option value="${escapeHtml(room)}">`).join('')}
+            ${existingRooms.map((room) => `<option value="${escapeHtml(room)}">`).join("")}
           </datalist>
         </label>
         
         <label class="form-field">
           <span>星期</span>
           <select data-field="day">
-            ${visibleDays.map(day => `<option value="${day}">${DAY_LABELS[day]}</option>`).join('')}
+            ${visibleDays.map((day) => `<option value="${day}">${DAY_LABELS[day]}</option>`).join("")}
           </select>
         </label>
         
@@ -225,20 +270,24 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
         
         <label class="form-field">
           <span>教师</span>
-          <input type="text" data-field="teacher" value="${escapeHtml(arrangement.teacher || '')}">
+          <input type="text" data-field="teacher" value="${escapeHtml(arrangement.teacher || "")}">
         </label>
         
         <label class="form-field">
           <span>教室</span>
-          <input type="text" data-field="room" value="${escapeHtml(arrangement.room || '')}">
+          <input type="text" data-field="room" value="${escapeHtml(arrangement.room || "")}">
         </label>
         
         <label class="form-field">
           <span>星期</span>
           <select data-field="day">
-            ${visibleDays.map(day => `
-              <option value="${day}" ${arrangement.day === day ? 'selected' : ''}>${DAY_LABELS[day]}</option>
-            `).join('')}
+            ${visibleDays
+              .map(
+                (day) => `
+              <option value="${day}" ${arrangement.day === day ? "selected" : ""}>${DAY_LABELS[day]}</option>
+            `,
+              )
+              .join("")}
           </select>
         </label>
         
@@ -276,7 +325,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
               arrangement.day === courseView.day &&
               arrangement.startNode === courseView.startNode &&
               arrangement.startWeek === courseView.startWeek &&
-              arrangement.endWeek === courseView.endWeek
+              arrangement.endWeek === courseView.endWeek,
           );
 
           if (arrangementIndex < 0) return null;
@@ -325,7 +374,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
         return `第 ${index + 1} 条课程安排的结束周超出最大周次 ${maxWeek}`;
       }
       const courseDef = draftParsed.courseDefinitions.find(
-        (course) => course.id === arrangement.id
+        (course) => course.id === arrangement.id,
       );
       if (!courseDef || !courseDef.courseName?.trim()) {
         return `第 ${index + 1} 条课程安排关联课程名为空`;
@@ -342,29 +391,29 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
   }
 
   function bindEvents() {
-    container.querySelectorAll('[data-action]').forEach(btn => {
-      btn.addEventListener('click', handleAction);
+    container.querySelectorAll("[data-action]").forEach((btn) => {
+      btn.addEventListener("click", handleAction);
     });
-    
-    container.querySelectorAll('[data-arrangement-index]').forEach(card => {
-      card.addEventListener('click', () => {
+
+    container.querySelectorAll("[data-arrangement-index]").forEach((card) => {
+      card.addEventListener("click", () => {
         selectedArrangementIndex = Number(card.dataset.arrangementIndex);
         creatingCourse = false;
         render();
       });
     });
-    
-    container.querySelectorAll('[data-field]').forEach(field => {
-      field.addEventListener('input', handleFieldChange);
-      field.addEventListener('change', handleFieldChange);
+
+    container.querySelectorAll("[data-field]").forEach((field) => {
+      field.addEventListener("input", handleFieldChange);
+      field.addEventListener("change", handleFieldChange);
     });
   }
 
   function handleAction(e) {
     const action = e.target.dataset.action;
-    
+
     switch (action) {
-      case 'enter-edit':
+      case "enter-edit":
         editMode = true;
         draftParsed = deepClone(baselineParsed);
         selectedArrangementIndex = null;
@@ -372,8 +421,8 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
         validationError = "";
         render();
         break;
-        
-      case 'exit-edit':
+
+      case "exit-edit":
         editMode = false;
         draftParsed = deepClone(baselineParsed);
         selectedArrangementIndex = null;
@@ -381,31 +430,31 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
         validationError = "";
         render();
         break;
-        
-      case 'reset':
+
+      case "reset":
         draftParsed = deepClone(baselineParsed);
         selectedArrangementIndex = null;
         creatingCourse = false;
         validationError = "";
         render();
         break;
-        
-      case 'create-course':
+
+      case "create-course":
         creatingCourse = true;
         selectedArrangementIndex = null;
         render();
         break;
-        
-      case 'cancel-create':
+
+      case "cancel-create":
         creatingCourse = false;
         render();
         break;
-        
-      case 'submit-create':
+
+      case "submit-create":
         submitCreateCourse();
         break;
-        
-      case 'delete':
+
+      case "delete":
         if (selectedArrangementIndex !== null) {
           draftParsed.arrangements.splice(selectedArrangementIndex, 1);
           selectedArrangementIndex = null;
@@ -413,8 +462,8 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
           render();
         }
         break;
-        
-      case 'export':
+
+      case "export":
         exportJson();
         break;
     }
@@ -423,21 +472,23 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
   function handleFieldChange(e) {
     const field = e.target.dataset.field;
     const value = e.target.value;
-    
+
     if (creatingCourse) {
       // 创建模式下的字段更新
       return;
     }
-    
+
     if (selectedArrangementIndex === null) return;
-    
+
     const arrangement = draftParsed.arrangements[selectedArrangementIndex];
     if (!arrangement) return;
-    
-    if (field === 'courseName') {
-      const courseDef = draftParsed.courseDefinitions.find(c => c.id === arrangement.id);
+
+    if (field === "courseName") {
+      const courseDef = draftParsed.courseDefinitions.find(
+        (c) => c.id === arrangement.id,
+      );
       if (courseDef) courseDef.courseName = value;
-    } else if (field === 'teacher' || field === 'room') {
+    } else if (field === "teacher" || field === "room") {
       arrangement[field] = value;
     } else {
       const numValue = Number(value);
@@ -445,28 +496,38 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
         arrangement[field] = Math.floor(numValue);
       }
     }
-    
+
     validationError = validateDraft();
     render();
   }
 
   function submitCreateCourse() {
-    const courseName = container.querySelector('[data-field="courseName"]')?.value?.trim();
-    const teacher = container.querySelector('[data-field="teacher"]')?.value?.trim() || '';
-    const room = container.querySelector('[data-field="room"]')?.value?.trim() || '';
+    const courseName = container
+      .querySelector('[data-field="courseName"]')
+      ?.value?.trim();
+    const teacher =
+      container.querySelector('[data-field="teacher"]')?.value?.trim() || "";
+    const room =
+      container.querySelector('[data-field="room"]')?.value?.trim() || "";
     const day = Number(container.querySelector('[data-field="day"]')?.value);
-    const startNode = Number(container.querySelector('[data-field="startNode"]')?.value);
-    const startWeek = Number(container.querySelector('[data-field="startWeek"]')?.value);
-    const endWeek = Number(container.querySelector('[data-field="endWeek"]')?.value);
-    
+    const startNode = Number(
+      container.querySelector('[data-field="startNode"]')?.value,
+    );
+    const startWeek = Number(
+      container.querySelector('[data-field="startWeek"]')?.value,
+    );
+    const endWeek = Number(
+      container.querySelector('[data-field="endWeek"]')?.value,
+    );
+
     if (!courseName) {
       validationError = "新增课程的课程名不能为空";
       render();
       return;
     }
-    
+
     const maxWeek = Math.max(1, draftParsed.meta.maxWeek || 1);
-    
+
     if (!visibleDays.includes(day)) {
       validationError = "新增课程的星期不在当前课表显示范围内";
       render();
@@ -492,18 +553,18 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
       render();
       return;
     }
-    
+
     const maxCourseId = draftParsed.courseDefinitions.reduce(
       (maxId, course) => Math.max(maxId, course.id),
-      0
+      0,
     );
     const nextCourseId = maxCourseId + 1;
-    
+
     draftParsed.courseDefinitions.push({
       id: nextCourseId,
       courseName,
     });
-    
+
     draftParsed.arrangements.push({
       id: nextCourseId,
       day,
@@ -514,7 +575,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
       teacher,
       room,
     });
-    
+
     creatingCourse = false;
     selectedArrangementIndex = draftParsed.arrangements.length - 1;
     validationError = validateDraft();
@@ -528,7 +589,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
       render();
       return;
     }
-    
+
     validationError = "";
     const text = serializeTimetableDataToFileText(draftParsed);
     const blob = new Blob([text], { type: "application/json;charset=utf-8" });
@@ -540,7 +601,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
+
     // 退出编辑模式
     editMode = false;
     draftParsed = deepClone(baselineParsed);
@@ -550,7 +611,7 @@ export function initTimetableVisualEditor(container, viewModel, baselineParsed) 
   }
 
   function escapeHtml(text) {
-    const div = document.createElement('div');
+    const div = document.createElement("div");
     div.textContent = text;
     return div.innerHTML;
   }

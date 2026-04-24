@@ -473,12 +473,13 @@ body {
   --timetable-scale: 1;
   transform-origin: top left;
   transform: scale(var(--timetable-scale));
-  width: max(900px, calc(100px + var(--day-count, 5) * 180px));
+  width: 100%;
+  min-width: calc(100px + var(--day-count, 5) * 120px);
 }
 
 .timetable-header {
   display: grid;
-  grid-template-columns: 100px repeat(var(--day-count, 5), minmax(160px, 1fr));
+  grid-template-columns: 80px repeat(var(--day-count, 5), 1fr);
   border-bottom: 1px solid var(--border-divider);
   background-color: var(--bg-secondary);
 }
@@ -503,7 +504,7 @@ body {
 
 .timetable-row {
   display: grid;
-  grid-template-columns: 100px repeat(var(--day-count, 5), minmax(160px, 1fr));
+  grid-template-columns: 80px repeat(var(--day-count, 5), 1fr);
   border-bottom: 1px solid var(--border-divider);
 }
 
@@ -512,7 +513,7 @@ body {
 }
 
 .timetable-node-cell {
-  padding: 0.75rem 0.5rem;
+  padding: 0.75rem 0.375rem;
   border-right: 1px solid var(--border-divider);
   background-color: var(--bg-secondary);
 }

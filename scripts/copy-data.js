@@ -2,16 +2,16 @@
  * 复制数据文件到 dist 目录
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const rootDir = path.resolve(__dirname, '..');
-const sourceDir = path.join(rootDir, 'data');
-const targetDir = path.join(rootDir, 'dist', 'data');
+const rootDir = path.resolve(__dirname, "..");
+const sourceDir = path.join(rootDir, "data");
+const targetDir = path.join(rootDir, "dist", "data");
 
 /**
  * 递归复制目录
@@ -44,17 +44,19 @@ function copyRecursive(src, dest) {
   } else {
     // 复制文件
     fs.copyFileSync(src, dest);
-    console.log(`📄 复制文件: ${path.relative(rootDir, src)} → ${path.relative(rootDir, dest)}`);
+    console.log(
+      `📄 复制文件: ${path.relative(rootDir, src)} → ${path.relative(rootDir, dest)}`,
+    );
   }
 }
 
 // 执行复制
-console.log('🚀 开始复制数据文件...\n');
+console.log("🚀 开始复制数据文件...\n");
 
 try {
   copyRecursive(sourceDir, targetDir);
-  console.log('\n✅ 数据文件复制完成！');
+  console.log("\n✅ 数据文件复制完成！");
 } catch (error) {
-  console.error('\n❌ 复制失败:', error.message);
+  console.error("\n❌ 复制失败:", error.message);
   process.exit(1);
 }
