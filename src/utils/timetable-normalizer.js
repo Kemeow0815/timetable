@@ -27,20 +27,6 @@ function hashText(input) {
 }
 
 /**
- * 生成课程颜色
- * @param {string} courseName
- * @param {number} courseId
- * @returns {string}
- */
-function buildCourseColor(courseName, courseId) {
-  const seed = hashText(`${courseName}-${courseId}`);
-  const hue = seed % 360;
-  const saturation = 78;
-  const lightness = 68;
-  return `hsl(${hue} ${saturation}% ${lightness}%)`;
-}
-
-/**
  * 解析日期字符串
  * @param {string} ymd
  * @returns {Date | null}
@@ -78,35 +64,6 @@ export function resolveCurrentWeek(startDateText, maxWeek, now = new Date()) {
     return 1;
   }
   return week;
-}
-
-/**
- * 转换节次行数据
- * @param {import('../types/timetable.js').ParsedTimetableData} data
- * @returns {import('../types/timetable.js').TimetableNodeRow[]}
- */
-function toNodeRows(data) {
-  const rows = data.nodeTimes
-    .filter((item) => item.node >= 1 && item.node <= data.meta.nodes)
-    .sort((a, b) => a.node - b.node)
-    .map((item) => ({
-      node: item.node,
-      startTime: item.startTime,
-      endTime: item.endTime,
-    }));
-
-  if (rows.length > 0) {
-    return rows;
-  }
-
-  return Array.from({ length: data.meta.nodes }, (_, index) => {
-    const node = index + 1;
-    return {
-      node,
-      startTime: "--:--",
-      endTime: "--:--",
-    };
-  });
 }
 
 /**
@@ -186,14 +143,14 @@ function toCourseView(arrangement, courseName, color, nodeRows) {
   const fixedDurationNodes = 2;
   const maxNode = Math.max(
     ...nodeRows.map((row) => row.node),
-    arrangement.startNode
+    arrangement.startNode,
   );
   const endNode = Math.min(
     arrangement.startNode + fixedDurationNodes - 1,
-    maxNode
+    maxNode,
   );
   const startNodeRow = nodeRows.find(
-    (row) => row.node === arrangement.startNode
+    (row) => row.node === arrangement.startNode,
   );
   const endNodeRow = nodeRows.find((row) => row.node === endNode);
   const startTime = startNodeRow?.startTime ?? "--:--";
@@ -229,7 +186,7 @@ export function buildTimetableViewModel(data, selectedWeek) {
   const dayColumns = toDayColumns(data, week);
 
   const courseMap = new Map(
-    data.courseDefinitions.map((course) => [course.id, course])
+    data.courseDefinitions.map((course) => [course.id, course]),
   );
 
   /** @type {Record<number, import('../types/timetable.js').TimetableCourseView[]>} */
@@ -253,14 +210,14 @@ export function buildTimetableViewModel(data, selectedWeek) {
     const courseName = courseDef?.courseName ?? `课程 #${arrangement.id}`;
     const color = buildCourseColor(courseName, arrangement.id);
     coursesByDay[arrangement.day].push(
-      toCourseView(arrangement, courseName, color, nodeRows)
+      toCourseView(arrangement, courseName, color, nodeRows),
     );
   }
 
   for (const day of Object.keys(coursesByDay)) {
     coursesByDay[Number(day)].sort(
       (a, b) =>
-        a.startNode - b.startNode || a.courseName.localeCompare(b.courseName)
+        a.startNode - b.startNode || a.courseName.localeCompare(b.courseName),
     );
   }
 
@@ -273,4 +230,37 @@ export function buildTimetableViewModel(data, selectedWeek) {
     nodeRows,
     coursesByDay,
   };
+}
+
+// 导出工具函数
+export function toNodeRows(data) {
+  const rows = data.nodeTimes
+    .filter((item) => item.node >= 1 && item.node <= data.meta.nodes)
+    .sort((a, b) => a.node - b.node)
+    .map((item) => ({
+      node: item.node,
+      startTime: item.startTime,
+      endTime: item.endTime,
+    }));
+
+  if (rows.length > 0) {
+    return rows;
+  }
+
+  return Array.from({ length: data.meta.nodes }, (_, index) => {
+    const node = index + 1;
+    return {
+      node,
+      startTime: "--:--",
+      endTime: "--:--",
+    };
+  });
+}
+
+export function buildCourseColor(courseName, courseId) {
+  const seed = hashText(`${courseName}-${courseId}`);
+  const hue = seed % 360;
+  const saturation = 78;
+  const lightness = 68;
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
 }

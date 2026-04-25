@@ -14,7 +14,7 @@
 export function createLiveTimetableStatus(payload) {
   const payloadText = encodeURIComponent(
     JSON.stringify(
-      payload ?? { coursesByDay: {}, startDate: "2026-02-23", maxWeek: 20 },
+      payload ?? { coursesByDay: {}, startDate: "2026-03-02", maxWeek: 20 },
     ),
   );
 
@@ -203,10 +203,35 @@ function resolveLiveState(payload, now) {
 
   // 周末
   if (day >= 6) {
+    console.log("=== 周末处理 ===");
+    console.log("当前周次:", currentWeek);
+    console.log("下周周次:", nextWeek);
+
     const allCourses = getAllCoursesThisWeek(payload);
-    // 只显示下周的课程
-    const filteredCourses = filterCoursesByWeek(allCourses, nextWeek);
-    const nextWeekFirstCourse = filteredCourses.find((c) => c.day === 1);
+    console.log("所有课程数量:", allCourses.length);
+    console.log("payload.coursesByDay:", payload.coursesByDay);
+
+    // 过滤出下周的课程
+    const nextWeekCourses = allCourses.filter(
+      (c) => c.startWeek <= nextWeek && c.endWeek >= nextWeek,
+    );
+    console.log("下周课程数量:", nextWeekCourses.length);
+    console.log("下周课程:", nextWeekCourses);
+    // 展开查看每个课程的详细信息
+    nextWeekCourses.forEach((c, i) => {
+      console.log(`下周课程[${i}]:`, {
+        courseName: c.courseName,
+        day: c.day,
+        startWeek: c.startWeek,
+        endWeek: c.endWeek,
+        startNode: c.startNode,
+        room: c.room,
+      });
+    });
+
+    // 找到下周一的第一节课
+    const nextWeekFirstCourse = nextWeekCourses.find((c) => c.day === 1);
+    console.log("下周周一第一节课:", nextWeekFirstCourse);
 
     if (nextWeekFirstCourse) {
       const daysUntilMonday = day === 6 ? 2 : 1;

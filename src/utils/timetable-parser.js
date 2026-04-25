@@ -49,11 +49,69 @@ function ensureArray(value, index) {
 }
 
 /**
- * 解析课表文本（多行 JSON 格式）
+ * 解析课表文本
+ * 支持两种格式：
+ * 1. 单一 JSON 对象（新格式）
+ * 2. 多行 JSON 格式（旧格式）
  * @param {string} rawText
  * @returns {import('../types/timetable.js').ParsedTimetableData}
  */
 export function parseTimetableText(rawText) {
+  try {
+    // 尝试解析为单一 JSON 对象（新格式）
+    const data = JSON.parse(rawText);
+    
+    if (data.courses && data.schedules) {
+      // 新格式处理
+      const config = {
+        courseLen: data.courseLen || 45,
+        id: data.id || 0,
+        name: data.name || '课表'
+      };
+      
+      const nodeTimes = data.timeTable || [];
+      
+      const meta = {
+        id: data.id || 0,
+        tableName: data.settings?.tableName || data.name || '课表',
+        maxWeek: data.settings?.maxWeek || 20,
+        nodes: data.settings?.nodes || 11,
+        startDate: data.settings?.startDate || '2026-02-23',
+        timeTable: 1,
+        showSat: data.settings?.showSat || false,
+        showSun: data.settings?.showSun || false
+      };
+      
+      const courseDefinitions = data.courses.map(course => ({
+        id: course.id,
+        courseName: course.courseName,
+        color: course.color
+      }));
+      
+      const arrangements = data.schedules.map(schedule => ({
+        id: schedule.id,
+        day: schedule.day,
+        startNode: schedule.startNode,
+        step: schedule.step,
+        startWeek: schedule.startWeek,
+        endWeek: schedule.endWeek,
+        teacher: schedule.teacher || '',
+        room: schedule.room || ''
+      }));
+      
+      return {
+        config,
+        nodeTimes,
+        meta,
+        courseDefinitions,
+        arrangements
+      };
+    }
+  } catch (error) {
+    // 新格式解析失败，尝试旧格式
+  }
+
+  // 旧格式处理
   const lines = rawText
     .split(/\r?\n/)
     .map((line) => line.trim())

@@ -6,6 +6,8 @@ import { parseNewTimetableFormat } from "./utils/timetable-parser.js";
 import {
   buildTimetableViewModel,
   resolveCurrentWeek,
+  toNodeRows,
+  buildCourseColor,
 } from "./utils/timetable-normalizer.js";
 import {
   createTimetableGrid,
@@ -154,29 +156,82 @@ function renderTimetable() {
 
   // 渲染实时状态（传递完整的课程数据，不限制周次）
   const liveStatusContainer = document.getElementById("live-status-container");
-  // 构建包含所有周课程的完整数据
+  // 直接从原始数据构建包含所有周课程的完整数据
   const allCoursesByDay = {};
-  for (let week = 1; week <= baselineParsed.meta.maxWeek; week++) {
-    const weekViewModel = buildTimetableViewModel(baselineParsed, week);
-    for (const [day, courses] of Object.entries(weekViewModel.coursesByDay)) {
-      if (!allCoursesByDay[day]) {
-        allCoursesByDay[day] = [];
-      }
-      allCoursesByDay[day].push(...courses);
-    }
+  const nodeRows = toNodeRows(baselineParsed);
+  const courseMap = new Map(
+    baselineParsed.courseDefinitions.map((course) => [course.id, course]),
+  );
+
+  // 初始化每天的课程数组
+  for (let day = 1; day <= 7; day++) {
+    allCoursesByDay[day] = [];
   }
-  // 去重（同一课程可能在多个周出现）
+
+  // 处理所有课程安排
+  for (const arrangement of baselineParsed.arrangements) {
+    if (arrangement.day < 1 || arrangement.day > 7) {
+      continue;
+    }
+
+    const courseDef = courseMap.get(arrangement.id);
+    const courseName = courseDef?.courseName ?? `课程 #${arrangement.id}`;
+    const color = buildCourseColor(courseName, arrangement.id);
+
+    // 直接从原始安排创建课程视图，包含完整的周次信息
+    const fixedDurationNodes = 2;
+    const maxNode = Math.max(
+      ...nodeRows.map((row) => row.node),
+      arrangement.startNode,
+    );
+    const endNode = Math.min(
+      arrangement.startNode + fixedDurationNodes - 1,
+      maxNode,
+    );
+    const startNodeRow = nodeRows.find(
+      (row) => row.node === arrangement.startNode,
+    );
+    const endNodeRow = nodeRows.find((row) => row.node === endNode);
+    const startTime = startNodeRow?.startTime ?? "--:--";
+    const endTime = endNodeRow?.endTime ?? "--:--";
+
+    const course = {
+      courseId: arrangement.id,
+      courseName,
+      color,
+      teacher: arrangement.teacher?.trim() || "未填写",
+      room: arrangement.room?.trim() || "未填写",
+      day: arrangement.day,
+      startNode: arrangement.startNode,
+      endNode,
+      durationNodes: fixedDurationNodes,
+      startWeek: arrangement.startWeek,
+      endWeek: arrangement.endWeek,
+      nodeText: `第 ${arrangement.startNode}-${endNode} 节`,
+      timeText: `${startTime} - ${endTime}`,
+    };
+
+    allCoursesByDay[arrangement.day].push(course);
+  }
+
+  // 去重并排序（考虑周次，同一课程在不同周次视为不同课程）
   for (const day in allCoursesByDay) {
     const seenCourses = new Set();
-    allCoursesByDay[day] = allCoursesByDay[day].filter((course) => {
-      const key = `${course.courseId}-${course.day}-${course.startNode}`;
-      if (seenCourses.has(key)) {
-        return false;
-      }
-      seenCourses.add(key);
-      return true;
-    });
+    allCoursesByDay[day] = allCoursesByDay[day]
+      .filter((course) => {
+        const key = `${course.courseId}-${course.day}-${course.startNode}-${course.startWeek}-${course.endWeek}`;
+        if (seenCourses.has(key)) {
+          return false;
+        }
+        seenCourses.add(key);
+        return true;
+      })
+      .sort(
+        (a, b) =>
+          a.startNode - b.startNode || a.courseName.localeCompare(b.courseName),
+      );
   }
+
   liveStatusContainer.innerHTML = createLiveTimetableStatus({
     coursesByDay: allCoursesByDay,
     startDate: baselineParsed.meta.startDate,
