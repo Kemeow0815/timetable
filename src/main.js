@@ -152,10 +152,35 @@ function renderTimetable() {
   prevBtn.disabled = currentViewModel.currentWeek <= 1;
   nextBtn.disabled = currentViewModel.currentWeek >= currentViewModel.maxWeek;
 
-  // 渲染实时状态
+  // 渲染实时状态（传递完整的课程数据，不限制周次）
   const liveStatusContainer = document.getElementById("live-status-container");
+  // 构建包含所有周课程的完整数据
+  const allCoursesByDay = {};
+  for (let week = 1; week <= baselineParsed.meta.maxWeek; week++) {
+    const weekViewModel = buildTimetableViewModel(baselineParsed, week);
+    for (const [day, courses] of Object.entries(weekViewModel.coursesByDay)) {
+      if (!allCoursesByDay[day]) {
+        allCoursesByDay[day] = [];
+      }
+      allCoursesByDay[day].push(...courses);
+    }
+  }
+  // 去重（同一课程可能在多个周出现）
+  for (const day in allCoursesByDay) {
+    const seenCourses = new Set();
+    allCoursesByDay[day] = allCoursesByDay[day].filter((course) => {
+      const key = `${course.courseId}-${course.day}-${course.startNode}`;
+      if (seenCourses.has(key)) {
+        return false;
+      }
+      seenCourses.add(key);
+      return true;
+    });
+  }
   liveStatusContainer.innerHTML = createLiveTimetableStatus({
-    coursesByDay: currentViewModel.coursesByDay,
+    coursesByDay: allCoursesByDay,
+    startDate: baselineParsed.meta.startDate,
+    maxWeek: baselineParsed.meta.maxWeek,
   });
 
   // 重新初始化实时状态

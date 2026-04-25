@@ -7,10 +7,16 @@
  * 创建实时状态组件 HTML
  * @param {Object} payload
  * @param {Record<number, import('../types/timetable.js').TimetableCourseView[]>} payload.coursesByDay
+ * @param {string} payload.startDate - 开学日期
+ * @param {number} payload.maxWeek - 最大周数
  * @returns {string}
  */
 export function createLiveTimetableStatus(payload) {
-  const payloadText = encodeURIComponent(JSON.stringify(payload ?? { coursesByDay: {} }));
+  const payloadText = encodeURIComponent(
+    JSON.stringify(
+      payload ?? { coursesByDay: {}, startDate: "2026-02-23", maxWeek: 20 },
+    ),
+  );
 
   return `
     <div class="live-status-card" data-live-status-root data-live-payload="${payloadText}">
@@ -27,7 +33,7 @@ export function createLiveTimetableStatus(payload) {
  * @returns {string}
  */
 function hexToRgb(hex) {
-  hex = hex.replace('#', '');
+  hex = hex.replace("#", "");
 
   let r, g, b;
 
@@ -43,12 +49,12 @@ function hexToRgb(hex) {
     g = parseInt(hex.substring(2, 4), 16);
     b = parseInt(hex.substring(4, 6), 16);
   } else {
-    return 'rgb(128, 128, 128)';
+    return "rgb(128, 128, 128)";
   }
 
   // 获取当前主题
-  const theme = document.documentElement.getAttribute('data-theme');
-  const isDarkMode = theme === 'dark';
+  const theme = document.documentElement.getAttribute("data-theme");
+  const isDarkMode = theme === "dark";
 
   // 只在深色模式下增加亮度
   if (isDarkMode) {
@@ -73,7 +79,7 @@ function hexToRgb(hex) {
  * @returns {number | null}
  */
 function parseTimeToMinute(text) {
-  const parts = String(text || '').split(':');
+  const parts = String(text || "").split(":");
   if (parts.length !== 2) return null;
   const hour = Number(parts[0]);
   const minute = Number(parts[1]);
@@ -87,7 +93,9 @@ function parseTimeToMinute(text) {
  * @returns {{ startMinute: number, endMinute: number } | null}
  */
 function extractRangeMinutes(timeText) {
-  const match = String(timeText || '').match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+  const match = String(timeText || "").match(
+    /(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/,
+  );
   if (!match) return null;
   const startMinute = parseTimeToMinute(match[1]);
   const endMinute = parseTimeToMinute(match[2]);
@@ -113,7 +121,7 @@ function formatDuration(totalSeconds) {
   if (minutes > 0) parts.push(`${minutes}分钟`);
   if (seconds > 0 || parts.length === 0) parts.push(`${seconds}秒`);
 
-  return parts.join('，');
+  return parts.join("，");
 }
 
 /**
@@ -173,14 +181,32 @@ function getAllCoursesThisWeek(payload) {
  * @returns {Array<Array<{text: string, color?: string, bold?: boolean, strikethrough?: boolean}>>}
  */
 function resolveLiveState(payload, now) {
-  const currentSecond = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const currentSecond =
+    now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
   const currentMinute = Math.floor(currentSecond / 60);
   const day = now.getDay() === 0 ? 7 : now.getDay();
+
+  // 计算当前实际周次
+  const currentWeek = resolveCurrentWeek(
+    payload.startDate || "2026-02-23",
+    payload.maxWeek || 20,
+    now,
+  );
+  const nextWeek = Math.min(currentWeek + 1, payload.maxWeek || 20);
+
+  // 过滤课程，只保留指定周的课程
+  function filterCoursesByWeek(courses, targetWeek) {
+    return courses.filter((course) => {
+      return course.startWeek <= targetWeek && course.endWeek >= targetWeek;
+    });
+  }
 
   // 周末
   if (day >= 6) {
     const allCourses = getAllCoursesThisWeek(payload);
-    const nextWeekFirstCourse = allCourses.find((c) => c.day === 1);
+    // 只显示下周的课程
+    const filteredCourses = filterCoursesByWeek(allCourses, nextWeek);
+    const nextWeekFirstCourse = filteredCourses.find((c) => c.day === 1);
 
     if (nextWeekFirstCourse) {
       const daysUntilMonday = day === 6 ? 2 : 1;
@@ -190,31 +216,35 @@ function resolveLiveState(payload, now) {
         (currentMinute * 60 + now.getSeconds());
 
       return [
-        [{ text: '### 本周课毕' }],
+        [{ text: "### 本周课毕" }],
         [
-          { text: '下周首节：' },
+          { text: "下周首节：" },
           {
-            text: `${nextWeekFirstCourse.courseName} - ${nextWeekFirstCourse.room || '未知'}`,
+            text: `${nextWeekFirstCourse.courseName} - ${nextWeekFirstCourse.room || "未知"}`,
             bold: true,
             color: hexToRgb(nextWeekFirstCourse.color),
           },
         ],
         [
-          { text: '距上课还有：' },
+          { text: "距上课还有：" },
           { text: formatDuration(secondsUntilCourse), bold: true },
         ],
       ];
     }
 
-    return [[{ text: '### 周末' }]];
+    return [[{ text: "### 周末" }]];
   }
 
-  const courses = getTodayCourses(payload, now);
+  let courses = getTodayCourses(payload, now);
+  // 只显示当前周的课程
+  courses = filterCoursesByWeek(courses, currentWeek);
 
   // 今日无课
   if (courses.length === 0) {
     const allCourses = getAllCoursesThisWeek(payload);
-    const nextDayCourse = allCourses.find((c) => c.day > day);
+    // 只显示当前周的课程
+    const filteredCourses = filterCoursesByWeek(allCourses, currentWeek);
+    const nextDayCourse = filteredCourses.find((c) => c.day > day);
 
     if (nextDayCourse) {
       const daysUntil = nextDayCourse.day - day;
@@ -224,23 +254,23 @@ function resolveLiveState(payload, now) {
         (currentMinute * 60 + now.getSeconds());
 
       return [
-        [{ text: '### 今日课毕' }],
+        [{ text: "### 今日课毕" }],
         [
-          { text: '翌日首节：' },
+          { text: "翌日首节：" },
           {
-            text: `${nextDayCourse.courseName} - ${nextDayCourse.room || '未知'}`,
+            text: `${nextDayCourse.courseName} - ${nextDayCourse.room || "未知"}`,
             bold: true,
             color: hexToRgb(nextDayCourse.color),
           },
         ],
         [
-          { text: '距上课还有：' },
+          { text: "距上课还有：" },
           { text: formatDuration(secondsUntilCourse), bold: true },
         ],
       ];
     }
 
-    return [[{ text: '### 今日无课' }]];
+    return [[{ text: "### 今日无课" }]];
   }
 
   // 查找当前状态
@@ -250,16 +280,19 @@ function resolveLiveState(payload, now) {
     const next = courses[index + 1] || null;
 
     // 上课中
-    if (currentMinute >= current.startMinute && currentMinute < current.endMinute) {
+    if (
+      currentMinute >= current.startMinute &&
+      currentMinute < current.endMinute
+    ) {
       const remainSeconds = current.endMinute * 60 - currentSecond;
 
-      const result = [[{ text: '### 上课' }]];
+      const result = [[{ text: "### 上课" }]];
 
       if (prev) {
         result.push([
-          { text: '上节：', strikethrough: true },
+          { text: "上节：", strikethrough: true },
           {
-            text: `${prev.courseName} - ${prev.room || '未知'}`,
+            text: `${prev.courseName} - ${prev.room || "未知"}`,
             strikethrough: true,
             color: hexToRgb(prev.color),
           },
@@ -267,9 +300,9 @@ function resolveLiveState(payload, now) {
       }
 
       result.push([
-        { text: '本节：' },
+        { text: "本节：" },
         {
-          text: `${current.courseName} - ${current.room || '未知'}`,
+          text: `${current.courseName} - ${current.room || "未知"}`,
           bold: true,
           color: hexToRgb(current.color),
         },
@@ -277,16 +310,16 @@ function resolveLiveState(payload, now) {
 
       if (next) {
         result.push([
-          { text: '下节：' },
+          { text: "下节：" },
           {
-            text: `${next.courseName} - ${next.room || '未知'}`,
+            text: `${next.courseName} - ${next.room || "未知"}`,
             color: hexToRgb(next.color),
           },
         ]);
       }
 
       result.push([
-        { text: '距下课还有：' },
+        { text: "距下课还有：" },
         { text: formatDuration(remainSeconds), bold: true },
       ]);
 
@@ -294,29 +327,33 @@ function resolveLiveState(payload, now) {
     }
 
     // 课间
-    if (next && currentMinute >= current.endMinute && currentMinute < next.startMinute) {
+    if (
+      next &&
+      currentMinute >= current.endMinute &&
+      currentMinute < next.startMinute
+    ) {
       const remainSeconds = next.startMinute * 60 - currentSecond;
 
       return [
-        [{ text: '### 课间' }],
+        [{ text: "### 课间" }],
         [
-          { text: '上节：', strikethrough: true },
+          { text: "上节：", strikethrough: true },
           {
-            text: `${current.courseName} - ${current.room || '未知'}`,
+            text: `${current.courseName} - ${current.room || "未知"}`,
             strikethrough: true,
             color: hexToRgb(current.color),
           },
         ],
         [
-          { text: '下节：' },
+          { text: "下节：" },
           {
-            text: `${next.courseName} - ${next.room || '未知'}`,
+            text: `${next.courseName} - ${next.room || "未知"}`,
             bold: true,
             color: hexToRgb(next.color),
           },
         ],
         [
-          { text: '距上课还有：' },
+          { text: "距上课还有：" },
           { text: formatDuration(remainSeconds), bold: true },
         ],
       ];
@@ -327,7 +364,9 @@ function resolveLiveState(payload, now) {
   const lastCourse = courses[courses.length - 1];
   if (currentMinute >= lastCourse.endMinute) {
     const allCourses = getAllCoursesThisWeek(payload);
-    const nextDayCourse = allCourses.find((c) => c.day > day);
+    // 只显示当前周的课程
+    const filteredCourses = filterCoursesByWeek(allCourses, currentWeek);
+    const nextDayCourse = filteredCourses.find((c) => c.day > day);
 
     if (nextDayCourse) {
       const daysUntil = nextDayCourse.day - day;
@@ -337,23 +376,23 @@ function resolveLiveState(payload, now) {
         (currentMinute * 60 + now.getSeconds());
 
       return [
-        [{ text: '### 今日课毕' }],
+        [{ text: "### 今日课毕" }],
         [
-          { text: '翌日首节：' },
+          { text: "翌日首节：" },
           {
-            text: `${nextDayCourse.courseName} - ${nextDayCourse.room || '未知'}`,
+            text: `${nextDayCourse.courseName} - ${nextDayCourse.room || "未知"}`,
             bold: true,
             color: hexToRgb(nextDayCourse.color),
           },
         ],
         [
-          { text: '距上课还有：' },
+          { text: "距上课还有：" },
           { text: formatDuration(secondsUntilCourse), bold: true },
         ],
       ];
     }
 
-    return [[{ text: '### 今日课毕' }]];
+    return [[{ text: "### 今日课毕" }]];
   }
 
   // 第一节课前
@@ -361,17 +400,17 @@ function resolveLiveState(payload, now) {
   const remainSeconds = firstCourse.startMinute * 60 - currentSecond;
 
   return [
-    [{ text: '### 课前' }],
+    [{ text: "### 课前" }],
     [
-      { text: '首节：' },
+      { text: "首节：" },
       {
-        text: `${firstCourse.courseName} - ${firstCourse.room || '未知'}`,
+        text: `${firstCourse.courseName} - ${firstCourse.room || "未知"}`,
         bold: true,
         color: hexToRgb(firstCourse.color),
       },
     ],
     [
-      { text: '距上课还有：' },
+      { text: "距上课还有：" },
       { text: formatDuration(remainSeconds), bold: true },
     ],
   ];
@@ -392,24 +431,26 @@ function renderStatusLine(line) {
         styles.push(`color: ${segment.color}`);
       }
       if (segment.bold) {
-        classes.push('font-bold');
+        classes.push("font-bold");
       }
       if (segment.strikethrough) {
-        classes.push('line-through opacity-60');
+        classes.push("line-through opacity-60");
       }
 
-      const styleAttr = styles.length > 0 ? ` style="${styles.join('; ')}"` : '';
-      const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
+      const styleAttr =
+        styles.length > 0 ? ` style="${styles.join("; ")}"` : "";
+      const classAttr =
+        classes.length > 0 ? ` class="${classes.join(" ")}"` : "";
 
       // 处理标题
-      if (segment.text.startsWith('###')) {
-        const titleText = segment.text.replace('###', '').trim();
+      if (segment.text.startsWith("###")) {
+        const titleText = segment.text.replace("###", "").trim();
         return `<span class="live-status-title"${styleAttr}>${escapeHtml(titleText)}</span>`;
       }
 
       return `<span${classAttr}${styleAttr}>${escapeHtml(segment.text)}</span>`;
     })
-    .join('');
+    .join("");
 
   return `<p class="live-status-line">${segmentsHtml}</p>`;
 }
@@ -420,7 +461,7 @@ function renderStatusLine(line) {
  * @returns {string}
  */
 function escapeHtml(text) {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
 }
@@ -432,12 +473,12 @@ function escapeHtml(text) {
 function updateLiveStatusWidget(root) {
   if (!(root instanceof HTMLElement)) return;
 
-  const contentElement = root.querySelector('[data-live-content]');
+  const contentElement = root.querySelector("[data-live-content]");
   if (!(contentElement instanceof HTMLElement)) return;
 
   let payload;
   try {
-    const payloadRaw = decodeURIComponent(root.dataset.livePayload || '%7B%7D');
+    const payloadRaw = decodeURIComponent(root.dataset.livePayload || "%7B%7D");
     payload = JSON.parse(payloadRaw);
   } catch {
     payload = { coursesByDay: {} };
@@ -446,11 +487,33 @@ function updateLiveStatusWidget(root) {
   const now = new Date();
   const statusLines = resolveLiveState(payload, now);
 
-  const html = statusLines.map((line) => renderStatusLine(line)).join('');
+  const html = statusLines.map((line) => renderStatusLine(line)).join("");
   contentElement.innerHTML = html;
 
   // 显示组件
-  root.style.opacity = '1';
+  root.style.opacity = "1";
+}
+
+/**
+ * 计算当前实际周次
+ * @param {string} startDateText - 开学日期
+ * @param {number} maxWeek - 最大周数
+ * @param {Date} now - 当前时间
+ * @returns {number}
+ */
+function resolveCurrentWeek(startDateText, maxWeek, now = new Date()) {
+  const parts = startDateText.split("-").map((part) => Number(part));
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+    return 1;
+  }
+  const [year, month, day] = parts;
+  const startDate = new Date(year, month - 1, day);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diffDays = Math.floor((now.getTime() - startDate.getTime()) / msPerDay);
+  const week = Math.floor(diffDays / 7) + 1;
+  if (week < 1) return 1;
+  if (week > maxWeek) return 1;
+  return week;
 }
 
 /**
@@ -458,7 +521,7 @@ function updateLiveStatusWidget(root) {
  */
 export function initLiveTimetableStatus() {
   function refreshWidgets() {
-    const roots = document.querySelectorAll('[data-live-status-root]');
+    const roots = document.querySelectorAll("[data-live-status-root]");
     for (const root of roots) {
       updateLiveStatusWidget(root);
     }
@@ -468,12 +531,12 @@ export function initLiveTimetableStatus() {
   refreshWidgets();
 
   // 每秒更新一次（为了显示秒级倒计时）
-  const timerKey = '__liveStatusWidgetsTimer';
+  const timerKey = "__liveStatusWidgetsTimer";
   if (window[timerKey]) {
     clearInterval(window[timerKey]);
   }
   window[timerKey] = window.setInterval(refreshWidgets, 1000);
 
   // 页面重新获得焦点时更新
-  window.addEventListener('focus', refreshWidgets);
+  window.addEventListener("focus", refreshWidgets);
 }
