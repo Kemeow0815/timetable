@@ -140,13 +140,14 @@ function toDayColumns(data, currentWeek) {
  * @returns {import('../types/timetable.js').TimetableCourseView}
  */
 function toCourseView(arrangement, courseName, color, nodeRows) {
-  const fixedDurationNodes = 2;
+  // 使用 arrangement.step 作为课程持续节数，默认为 2
+  const durationNodes = arrangement.step || 2;
   const maxNode = Math.max(
     ...nodeRows.map((row) => row.node),
     arrangement.startNode,
   );
   const endNode = Math.min(
-    arrangement.startNode + fixedDurationNodes - 1,
+    arrangement.startNode + durationNodes - 1,
     maxNode,
   );
   const startNodeRow = nodeRows.find(
@@ -165,7 +166,7 @@ function toCourseView(arrangement, courseName, color, nodeRows) {
     day: arrangement.day,
     startNode: arrangement.startNode,
     endNode,
-    durationNodes: fixedDurationNodes,
+    durationNodes,
     startWeek: arrangement.startWeek,
     endWeek: arrangement.endWeek,
     nodeText: `第 ${arrangement.startNode}-${endNode} 节`,
